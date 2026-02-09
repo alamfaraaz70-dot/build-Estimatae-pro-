@@ -1,0 +1,8 @@
+{
+  "name": "BuildEstimate Pro",
+  "description": "A comprehensive construction planning and cost estimation platform connecting homeowners with professional engineers for accurate project budgeting.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ]
+}

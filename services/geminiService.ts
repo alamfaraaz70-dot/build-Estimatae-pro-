@@ -3,7 +3,6 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { ConstructionDetails, AiEstimateOption } from "../types";
 
 export const getAiEstimateOptions = async (details: ConstructionDetails): Promise<AiEstimateOption[]> => {
-  // Use process.env.API_KEY directly as per guidelines
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   const floorBreakdown = details.floorConfigs.map(f => 
@@ -19,15 +18,8 @@ ${floorBreakdown}
     - Additional Notes: ${details.notes || "None"}
     
     The 6 tiers should be:
-    1. Economy (Basic finishes, minimal costs)
-    2. Budget-Friendly (Decent materials, cost-conscious)
-    3. Standard (Market average quality)
-    4. Premium (High-quality finishes, branded fittings)
-    5. Luxury (Premium marble, designer woodwork)
-    6. Ultra-Luxury (Smart home, top-tier imported materials, architectural excellence)
-
-    Calculate realistic material and labor costs in Indian Rupees (INR) for each. 
-    Explain briefly (1 sentence) what defines that tier.`;
+    1. Economy, 2. Budget-Friendly, 3. Standard, 4. Premium, 5. Luxury, 6. Ultra-Luxury.
+    Calculate realistic material and labor costs in INR. Explain briefly what defines each tier.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -37,46 +29,76 @@ ${floorBreakdown}
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,
-          description: "List of 6 estimate options",
           items: {
             type: Type.OBJECT,
             properties: {
-              label: { type: Type.STRING, description: "Tier name (Economy, Standard, etc.)" },
-              material: { type: Type.NUMBER, description: "Estimated material cost in INR" },
-              labor: { type: Type.NUMBER, description: "Estimated labor cost in INR" },
-              explanation: { type: Type.STRING, description: "Brief description of material quality" },
+              label: { type: Type.STRING },
+              material: { type: Type.NUMBER },
+              labor: { type: Type.NUMBER },
+              explanation: { type: Type.STRING },
             },
             required: ["label", "material", "labor", "explanation"],
-            propertyOrdering: ["label", "material", "labor", "explanation"],
           }
         },
       },
     });
 
-    // Directly access the text property as per guidelines
-    const jsonStr = response.text?.trim() || "[]";
-    return JSON.parse(jsonStr);
+    return JSON.parse(response.text?.trim() || "[]");
   } catch (error) {
     console.error("Gemini API Error:", error);
-    // Dynamic fallback
-    const roomsCount = details.floorConfigs.reduce((sum, f) => sum + f.rooms, 0);
-    const baseMaterial = (details.plotArea * 1200) + (roomsCount * 40000);
-    const baseLabor = (details.plotArea * 800) + (roomsCount * 25000);
-
-    const multipliers = [
-      { label: 'Economy', m: 0.8, l: 0.85 },
-      { label: 'Standard', m: 1.0, l: 1.0 },
-      { label: 'Premium', m: 1.4, l: 1.2 },
-      { label: 'Luxury', m: 1.8, l: 1.4 },
-      { label: 'Ultra-Luxury', m: 2.5, l: 1.8 },
-      { label: 'Eco-Friendly', m: 1.6, l: 1.5 },
-    ];
-
-    return multipliers.map(tier => ({
-      label: tier.label,
-      material: Math.round(baseMaterial * tier.m),
-      labor: Math.round(baseLabor * tier.l),
-      explanation: `Estimated costs for ${tier.label} grade construction based on general market trends.`
-    }));
+    return [];
   }
+};
+
+export const generateHouseLayout = async (details: ConstructionDetails, style: string = 'Modernist'): Promise<string | null> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  
+  const floor1 = details.floorConfigs[0];
+  const prompt = `Professional 2D architectural floor plan for a ${details.plotArea} sq ft site. 
+    Style: ${style} architectural drawing.
+    Level 1 contains ${floor1.rooms} rooms, ${floor1.bathrooms} bathrooms, and a kitchen (${floor1.kitchenType}). 
+    ${details.parking ? "Include a dedicated parking area/garage." : "No parking."}
+    Visual: White background, black technical lines, industrial blue and yellow accent colors, clear labels for rooms.
+    Perspective: Top-down blueprint perspective. Realistic architectural standards for construction.`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-image',
+      contents: {
+        parts: [{ text: prompt }],
+      },
+      config: {
+        imageConfig: {
+          aspectRatio: "1:1"
+        },
+      },
+    });
+
+    for (const part of response.candidates[0].content.parts) {
+      if (part.inlineData) {
+        return `data:image/png;base64,${part.inlineData.data}`;
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error(`Gemini Image Generation Error (${style}):`, error);
+    return null;
+  }
+};
+
+export const generateTripleLayouts = async (details: ConstructionDetails): Promise<{url: string, style: string}[]> => {
+  const styles = [
+    { name: 'Modernist Edge', prompt: 'Modern minimalist luxury with open-plan concepts' },
+    { name: 'Classic Heritage', prompt: 'Traditional solid structure with defined separated rooms' },
+    { name: 'Eco Minimal', prompt: 'Compact, efficient space optimization with focus on natural flow' }
+  ];
+
+  const results = await Promise.all(
+    styles.map(async (style) => {
+      const url = await generateHouseLayout(details, style.prompt);
+      return { url: url || '', style: style.name };
+    })
+  );
+
+  return results.filter(r => r.url !== '');
 };

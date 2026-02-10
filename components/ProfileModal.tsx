@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { User } from '../types';
+import { User, UserRole } from '../types';
 
 interface ProfileModalProps {
   user: User;
@@ -11,6 +11,9 @@ interface ProfileModalProps {
 const ProfileModal: React.FC<ProfileModalProps> = ({ user, onClose, onUpdate }) => {
   const [phone, setPhone] = useState(user.phone || '');
   const [address, setAddress] = useState(user.address || '');
+  const [experience, setExperience] = useState(user.experience || 0);
+  const [projectsDone, setProjectsDone] = useState(user.projectsDone || 0);
+  const [companyName, setCompanyName] = useState(user.companyName || '');
   const [isSaving, setIsSaving] = useState(false);
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -22,23 +25,32 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ user, onClose, onUpdate }) 
     setIsSaving(true);
     // Simulate API call
     setTimeout(() => {
-      onUpdate({ ...user, phone, address });
+      onUpdate({ 
+        ...user, 
+        phone, 
+        address, 
+        experience, 
+        projectsDone, 
+        companyName 
+      });
       setIsSaving(false);
       onClose();
     }, 500);
   };
 
+  const isEngineer = user.role === UserRole.ENGINEER;
+
   return (
     <div className="fixed inset-0 z-[150] bg-construction-slate/90 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white w-full max-w-md rounded-xl overflow-hidden shadow-2xl animate-in zoom-in duration-200 border-4 border-construction-yellow">
-        <div className="bg-construction-slate text-white p-6 flex justify-between items-center">
+      <div className="bg-white w-full max-w-md rounded-xl overflow-hidden shadow-2xl animate-in zoom-in duration-200 border-4 border-construction-yellow flex flex-col max-h-[90vh]">
+        <div className="bg-construction-slate text-white p-6 flex justify-between items-center flex-shrink-0">
           <h3 className="text-xl font-black uppercase tracking-widest italic">User Profile</h3>
           <button onClick={onClose} className="text-construction-yellow hover:scale-110 transition-transform">
             <i className="fas fa-times-circle text-2xl"></i>
           </button>
         </div>
 
-        <div className="p-8 space-y-6 construction-grid">
+        <div className="p-8 space-y-6 overflow-y-auto construction-grid flex-grow">
           <div className="flex flex-col items-center mb-4">
              <div className="w-20 h-20 bg-construction-yellow text-construction-slate rounded-2xl flex items-center justify-center text-4xl font-black mb-2 shadow-[4px_4px_0px_0px_rgba(30,41,59,1)]">
                 {user.name.charAt(0)}
@@ -69,6 +81,46 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ user, onClose, onUpdate }) 
               />
             </div>
 
+            {isEngineer && (
+              <div className="space-y-4 border-y-2 border-slate-100 py-4 my-4">
+                <p className="text-[10px] font-black text-construction-caution uppercase tracking-[0.2em] mb-2 text-center">Professional Credentials</p>
+                
+                <div>
+                  <label className="block text-[10px] font-black text-slate-500 uppercase mb-1">Company / Firm Name</label>
+                  <input 
+                    type="text" 
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
+                    placeholder="e.g. Skyline Structural Solutions"
+                    className="w-full p-3 rounded bg-white border-2 border-slate-200 text-construction-slate font-black text-sm focus:border-construction-yellow outline-none transition-all"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-500 uppercase mb-1">Years of Experience</label>
+                    <input 
+                      type="number" 
+                      value={experience || ''}
+                      onChange={(e) => setExperience(Number(e.target.value))}
+                      placeholder="0"
+                      className="w-full p-3 rounded bg-white border-2 border-slate-200 text-construction-slate font-black text-sm focus:border-construction-yellow outline-none transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-500 uppercase mb-1">Projects Delivered</label>
+                    <input 
+                      type="number" 
+                      value={projectsDone || ''}
+                      onChange={(e) => setProjectsDone(Number(e.target.value))}
+                      placeholder="0"
+                      className="w-full p-3 rounded bg-white border-2 border-slate-200 text-construction-slate font-black text-sm focus:border-construction-yellow outline-none transition-all"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div>
               <label className="block text-[10px] font-black text-slate-500 uppercase mb-1">Current Address</label>
               <textarea 
@@ -91,7 +143,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ user, onClose, onUpdate }) 
           </div>
         </div>
 
-        <div className="p-6 bg-slate-50 border-t-4 border-construction-yellow flex gap-4">
+        <div className="p-6 bg-slate-50 border-t-4 border-construction-yellow flex gap-4 flex-shrink-0">
           <button 
             disabled={isSaving}
             onClick={handleSave}

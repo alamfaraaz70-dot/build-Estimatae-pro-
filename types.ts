@@ -13,12 +13,16 @@ export enum ProjectStatus {
 
 export interface User {
   id: string;
-  name: string;
+  name: string; // Display name
+  firstName?: string;
+  lastName?: string;
   email: string;
   password?: string;
   role: UserRole;
   isApproved?: boolean;
   experience?: number;
+  projectsDone?: number;
+  companyName?: string;
   profileImage?: string;
   phone?: string;
   address?: string;
@@ -63,6 +67,8 @@ export interface Estimate {
   engineerName: string;
   materialCost: number;
   laborCost: number;
+  tokenPercentage?: number;
+  tokenAmount?: number;
   submittedAt: string;
   message?: string;
 }
@@ -71,11 +77,16 @@ export interface Project {
   id: string;
   customerId: string;
   customerName: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  mobile_number?: string;
   details: ConstructionDetails;
   status: ProjectStatus;
   createdAt: string;
   estimates: Estimate[];
   messages?: ChatMessage[];
+  selectedLayoutUrl?: string;
 }
 
 export interface AuthState {

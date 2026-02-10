@@ -30,7 +30,9 @@ export const initialUsers: User[] = [
     password: 'password123',
     role: UserRole.ENGINEER, 
     isApproved: true, 
-    experience: 8 
+    experience: 8,
+    projectsDone: 45,
+    companyName: 'Smith Structural Dynamics'
   },
   { 
     id: '3', 

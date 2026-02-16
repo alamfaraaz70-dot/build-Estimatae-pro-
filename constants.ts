@@ -58,6 +58,8 @@ export const initialProjects: Project[] = [
       ],
       parking: true,
       budgetRange: "₹30 - ₹50 Lakhs",
+      // Fix: Added missing required property 'timelineMonths'
+      timelineMonths: 7,
       notes: 'Industrial style workshop house.'
     },
     estimates: [

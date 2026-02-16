@@ -5,6 +5,7 @@ import { GoogleGenAI } from "@google/genai";
 interface Message {
   role: 'user' | 'bot';
   text: string;
+  sources?: { uri: string; title: string }[];
 }
 
 interface FieldBotModalProps {
@@ -13,7 +14,7 @@ interface FieldBotModalProps {
 
 const FieldBotModal: React.FC<FieldBotModalProps> = ({ onClose }) => {
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'bot', text: 'Operational! I am FieldBot, your AI Site Supervisor. Provide a location (Village, City, Pincode) and I will calculate a professional construction estimate for you.' }
+    { role: 'bot', text: 'Operational! I am FieldBot, your AI Site Supervisor. Provide a location (Village, City, Pincode) and I will calculate a professional construction estimate for you. I can also fetch real-time market data for materials and labor.' }
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -40,8 +41,12 @@ const FieldBotModal: React.FC<FieldBotModalProps> = ({ onClose }) => {
         model: 'gemini-3-flash-preview',
         contents: userMsg,
         config: {
+          tools: [{ googleSearch: {} }],
           systemInstruction: `You are FieldBot, a world-class structural and civil engineering AI for the BuildEstimate Pro platform. 
           When a user provides a location (village/city/state/pincode), estimate house construction cost based on that area's economics.
+          
+          REAL-TIME DATA:
+          - You have access to Google Search. Use it to find up-to-date material prices (cement, steel, etc.) and labor rates for specific regions if the user asks for current data or if the query relates to specific market trends.
           
           RULES:
           - Use Indian construction standards (2024–2025 realistic pricing).
@@ -94,8 +99,28 @@ const FieldBotModal: React.FC<FieldBotModalProps> = ({ onClose }) => {
       });
 
       const botText = response.text || "Connection lag detected. Please restate the query.";
-      setMessages(prev => [...prev, { role: 'bot', text: botText }]);
+      
+      // Extract grounding metadata for source URLs
+      const sources: { uri: string; title: string }[] = [];
+      const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
+      if (chunks) {
+        chunks.forEach((chunk: any) => {
+          if (chunk.web && chunk.web.uri) {
+            sources.push({
+              uri: chunk.web.uri,
+              title: chunk.web.title || 'Source'
+            });
+          }
+        });
+      }
+
+      setMessages(prev => [...prev, { 
+        role: 'bot', 
+        text: botText,
+        sources: sources.length > 0 ? Array.from(new Set(sources.map(s => s.uri))).map(uri => sources.find(s => s.uri === uri)!) : undefined
+      }]);
     } catch (error) {
+      console.error("FieldBot Error:", error);
       setMessages(prev => [...prev, { role: 'bot', text: "Error: AI Logic Core offline. Check your network connection." }]);
     } finally {
       setLoading(false);
@@ -129,15 +154,36 @@ const FieldBotModal: React.FC<FieldBotModalProps> = ({ onClose }) => {
                   : 'bg-white text-slate-800 rounded-tl-none border-2 border-slate-200 leading-relaxed font-mono text-[13px]'
               }`}>
                 {m.text}
+                
+                {m.sources && m.sources.length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-slate-100">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Verified Sources:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {m.sources.map((source, idx) => (
+                        <a 
+                          key={idx} 
+                          href={source.uri} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="bg-slate-50 hover:bg-construction-yellow/20 text-blue-600 hover:text-blue-800 px-2 py-1 rounded text-[10px] font-bold border border-slate-200 transition-colors flex items-center gap-1"
+                        >
+                          <i className="fas fa-external-link-alt text-[8px]"></i>
+                          {source.title.length > 25 ? source.title.substring(0, 25) + '...' : source.title}
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           ))}
           {loading && (
             <div className="flex justify-start">
-              <div className="bg-white p-4 rounded-2xl rounded-tl-none border-2 border-slate-200 flex gap-2">
+              <div className="bg-white p-4 rounded-2xl rounded-tl-none border-2 border-slate-200 flex gap-2 shadow-sm">
                 <div className="w-2 h-2 bg-construction-yellow rounded-full animate-bounce"></div>
                 <div className="w-2 h-2 bg-construction-yellow rounded-full animate-bounce [animation-delay:0.2s]"></div>
                 <div className="w-2 h-2 bg-construction-yellow rounded-full animate-bounce [animation-delay:0.4s]"></div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Consulting Web Registry...</span>
               </div>
             </div>
           )}
@@ -148,7 +194,7 @@ const FieldBotModal: React.FC<FieldBotModalProps> = ({ onClose }) => {
             type="text" 
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Enter location (e.g., Patna, Bihar or 800001)..." 
+            placeholder="Ask about location rates or real-time steel prices..." 
             className="flex-grow p-4 bg-slate-100 border-2 border-slate-200 rounded-xl outline-none focus:border-construction-yellow transition-all font-bold text-sm"
           />
           <button 

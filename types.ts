@@ -99,6 +99,7 @@ export interface Project {
   estimates: Estimate[];
   messages?: ChatMessage[];
   selectedLayoutUrl?: string;
+  selectedDesignUrl?: string;
   layoutHistory?: LayoutArchive[];
 }
 

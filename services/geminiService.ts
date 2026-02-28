@@ -127,3 +127,52 @@ export const generateTripleLayouts = async (details: ConstructionDetails): Promi
 
   return results.filter(r => r.url !== r.style && r.url !== '');
 };
+
+export const generateHouseDesigns = async (details: ConstructionDetails, style: string): Promise<{url: string, label: string}[]> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  
+  const prompt = `Create a 2D architectural elevation (exterior view) of a house with the following specs:
+    - Style: ${style}
+    - Floors: ${details.floors}
+    - Total Area: ${details.plotArea} sq ft
+    - Location: ${details.location || "India"}
+    
+    VISUAL REQUIREMENTS:
+    - Show the front elevation of the house.
+    - Professional architectural rendering style (2D colored or high-quality line art).
+    - Include landscaping, windows, doors, and roof details.
+    - If ${details.parking} is true, show a visible parking area or garage.
+    - The image should look like a professional design proposal for a client.`;
+
+  const labels = ["Front Elevation", "Side Perspective", "Modern Concept"];
+  
+  try {
+    const results = await Promise.all(
+      [1, 2, 3].map(async (_, i) => {
+        const response = await ai.models.generateContent({
+          model: 'gemini-2.5-flash-image',
+          contents: {
+            parts: [{ text: `${prompt} (Variation ${i + 1}: ${labels[i]})` }],
+          },
+          config: {
+            imageConfig: {
+              aspectRatio: "16:9"
+            },
+          },
+        });
+
+        for (const part of response.candidates[0].content.parts) {
+          if (part.inlineData) {
+            return { url: `data:image/png;base64,${part.inlineData.data}`, label: labels[i] };
+          }
+        }
+        return null;
+      })
+    );
+
+    return results.filter((r): r is {url: string, label: string} => r !== null);
+  } catch (error) {
+    console.error("Gemini Design Generation Error:", error);
+    return [];
+  }
+};

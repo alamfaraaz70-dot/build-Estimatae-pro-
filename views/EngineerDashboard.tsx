@@ -133,6 +133,33 @@ const EngineerDashboard: React.FC<EngineerDashboardProps> = ({ user, projects, o
                         <div className="bg-slate-50 p-4 rounded-xl border border-slate-100"><p className="text-[9px] text-slate-400 font-black uppercase">Timeline</p><p className="font-black text-xs text-blue-600">{p.details.timelineMonths} MONTHS</p></div>
                         <div className="bg-slate-50 p-4 rounded-xl border border-slate-100"><p className="text-[9px] text-slate-400 font-black uppercase">Goal Budget</p><p className="font-black text-xs text-green-600">{p.details.budgetRange}</p></div>
                       </div>
+
+                      {(p.selectedLayoutUrl || p.selectedDesignUrl) && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                          {p.selectedLayoutUrl && (
+                            <div className="relative group cursor-zoom-in" onClick={() => setPreviewImageUrl(p.selectedLayoutUrl || null)}>
+                              <p className="text-[9px] font-black text-slate-400 uppercase mb-2 tracking-widest">Selected Floor Blueprint</p>
+                              <div className="h-40 rounded-xl overflow-hidden border-2 border-slate-100 bg-slate-50">
+                                <img src={p.selectedLayoutUrl} className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform" />
+                              </div>
+                              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 rounded-xl">
+                                <i className="fas fa-search-plus text-white text-2xl"></i>
+                              </div>
+                            </div>
+                          )}
+                          {p.selectedDesignUrl && (
+                            <div className="relative group cursor-zoom-in" onClick={() => setPreviewImageUrl(p.selectedDesignUrl || null)}>
+                              <p className="text-[9px] font-black text-slate-400 uppercase mb-2 tracking-widest">Selected 2D Design Concept</p>
+                              <div className="h-40 rounded-xl overflow-hidden border-2 border-slate-100 bg-slate-50">
+                                <img src={p.selectedDesignUrl} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                              </div>
+                              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 rounded-xl">
+                                <i className="fas fa-search-plus text-white text-2xl"></i>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <div className="flex flex-col gap-3 min-w-[200px]">
                       {p.status === ProjectStatus.SUBMITTED ? (

@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, Project, ProjectStatus, ConstructionDetails, FloorConfig, Estimate, ChatMessage, LayoutArchive } from '../types';
 import ChatRoom from '../components/ChatRoom';
-import { generateTripleLayouts } from '../services/geminiService';
+import { generateTripleLayouts, generateHouseDesigns } from '../services/geminiService';
 import EngineerProfileViewModal from '../components/EngineerProfileViewModal';
 import ImagePreviewModal from '../components/ImagePreviewModal';
 import SuccessTick from '../components/SuccessTick';
@@ -35,8 +35,11 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ user, projects, o
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [generatingLayout, setGeneratingLayout] = useState(false);
+  const [generatingDesigns, setGeneratingDesigns] = useState(false);
   const [aiLayoutOptions, setAiLayoutOptions] = useState<{url: string, style: string}[]>([]);
+  const [houseDesignOptions, setHouseDesignOptions] = useState<{url: string, label: string}[]>([]);
   const [selectedLayoutIndex, setSelectedLayoutIndex] = useState<number | null>(null);
+  const [selectedDesignIndex, setSelectedDesignIndex] = useState<number | null>(null);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [viewingEngineer, setViewingEngineer] = useState<User | null>(null);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
@@ -99,12 +102,21 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ user, projects, o
     if (step === 3) {
       setStep(4);
       handleGenerateLayouts();
+    } else if (step === 4) {
+      setStep(5);
+      handleGenerateDesigns();
     } else {
       setStep(prev => prev + 1);
     }
   };
   
-  const handleBack = () => setStep(prev => prev - 1);
+  const handleBack = () => {
+    if (step === 5) {
+      setStep(4);
+    } else {
+      setStep(prev => prev - 1);
+    }
+  };
 
   const handleGenerateLayouts = async () => {
     setGeneratingLayout(true);
@@ -112,6 +124,15 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ user, projects, o
     const options = await generateTripleLayouts(details);
     setAiLayoutOptions(options);
     setGeneratingLayout(false);
+  };
+
+  const handleGenerateDesigns = async () => {
+    if (selectedLayoutIndex === null) return;
+    setGeneratingDesigns(true);
+    setSelectedDesignIndex(null);
+    const designs = await generateHouseDesigns(details, aiLayoutOptions[selectedLayoutIndex].style);
+    setHouseDesignOptions(designs);
+    setGeneratingDesigns(false);
   };
 
   const updateFloorConfig = (floorNum: number, field: keyof FloorConfig, value: any) => {
@@ -149,6 +170,7 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ user, projects, o
       estimates: [],
       messages: [],
       selectedLayoutUrl: aiLayoutOptions[selectedLayoutIndex].url,
+      selectedDesignUrl: selectedDesignIndex !== null ? houseDesignOptions[selectedDesignIndex].url : undefined,
       layoutHistory: archive
     };
 
@@ -158,7 +180,9 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ user, projects, o
       setStep(1);
       setLoading(false);
       setAiLayoutOptions([]);
+      setHouseDesignOptions([]);
       setSelectedLayoutIndex(null);
+      setSelectedDesignIndex(null);
       
       setShowSuccessOverlay(true);
       setTimeout(() => setShowSuccessOverlay(false), 3500);
@@ -404,11 +428,38 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ user, projects, o
                   )}
                 </div>
               )}
+              {step === 5 && (
+                <div className="space-y-8">
+                  <div className="text-center">
+                    <h4 className="text-3xl font-black text-construction-slate uppercase italic">Exterior Design Concepts</h4>
+                    <p className="text-slate-500 font-bold text-xs uppercase mt-1">Visualizing your future home structure based on selected layout.</p>
+                  </div>
+                  {generatingDesigns ? (
+                    <div className="py-24 text-center">
+                      <i className="fas fa-palette fa-spin text-7xl text-construction-yellow mb-8"></i>
+                      <p className="text-sm font-black uppercase tracking-[0.3em] text-slate-600 animate-pulse italic">Rendering Architectural Elevations...</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {houseDesignOptions.map((opt, idx) => (
+                        <div key={idx} onClick={() => setSelectedDesignIndex(idx)} className={`relative cursor-pointer group rounded-xl overflow-hidden border-4 transition-all ${selectedDesignIndex === idx ? 'border-construction-yellow shadow-2xl scale-[1.02] z-10' : 'border-slate-100 opacity-60'}`}>
+                          <div className="aspect-video overflow-hidden">
+                            <img src={opt.url} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                          </div>
+                          <div className={`p-4 ${selectedDesignIndex === idx ? 'bg-construction-yellow text-construction-slate' : 'bg-slate-50 text-slate-500'}`}>
+                            <p className="font-black uppercase italic text-xs">{opt.label}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <div className="p-6 bg-slate-50 flex gap-4 border-t-4 border-construction-yellow">
               {step > 1 && <button onClick={handleBack} className="px-8 py-4 rounded font-black uppercase text-xs text-slate-500 border-2 border-slate-300">Previous</button>}
-              <button onClick={step === 4 ? handleFinalSubmit : handleNext} disabled={loading || generatingLayout || (step === 4 && selectedLayoutIndex === null)} className="flex-1 bg-construction-yellow text-construction-slate py-4 rounded font-black uppercase tracking-widest shadow-[4px_4px_0px_0px_rgba(30,41,59,1)] active:translate-y-1 transition-all disabled:opacity-30">
-                {loading ? <i className="fas fa-spinner fa-spin"></i> : (step === 4 ? 'Confirm & Deploy' : 'Advance Stage')}
+              <button onClick={step === 5 ? handleFinalSubmit : handleNext} disabled={loading || generatingLayout || generatingDesigns || (step === 4 && selectedLayoutIndex === null) || (step === 5 && selectedDesignIndex === null)} className="flex-1 bg-construction-yellow text-construction-slate py-4 rounded font-black uppercase tracking-widest shadow-[4px_4px_0px_0px_rgba(30,41,59,1)] active:translate-y-1 transition-all disabled:opacity-30">
+                {loading ? <i className="fas fa-spinner fa-spin"></i> : (step === 5 ? 'Confirm & Deploy' : 'Advance Stage')}
               </button>
             </div>
           </div>

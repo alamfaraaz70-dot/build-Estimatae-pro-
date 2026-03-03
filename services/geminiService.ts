@@ -3,14 +3,12 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { ConstructionDetails, AiEstimateOption } from "../types";
 
 export const getAiEstimateOptions = async (details: ConstructionDetails): Promise<AiEstimateOption[]> => {
-  // Try multiple possible environment variable names for maximum compatibility
-  const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || 
-                 process.env.GEMINI_API_KEY || 
-                 process.env.API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
 
   if (!apiKey || apiKey === 'undefined' || apiKey === '') {
-    console.error("Gemini API Key is missing. Ensure VITE_GEMINI_API_KEY or GEMINI_API_KEY is set in Vercel.");
-    return [];
+    const msg = "Gemini API Key is missing. Please set VITE_GEMINI_API_KEY in Vercel.";
+    console.error(msg);
+    throw new Error(msg);
   }
   
   const ai = new GoogleGenAI({ apiKey });
@@ -67,9 +65,7 @@ ${floorBreakdown}
 };
 
 export const generateHouseLayout = async (details: ConstructionDetails, style: string = 'Modernist'): Promise<string | null> => {
-  const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || 
-                 process.env.GEMINI_API_KEY || 
-                 process.env.API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
 
   if (!apiKey || apiKey === 'undefined' || apiKey === '') {
     console.error("CRITICAL: Gemini API Key is missing.");
@@ -159,9 +155,7 @@ export const generateTripleLayouts = async (details: ConstructionDetails): Promi
 };
 
 export const generateHouseDesigns = async (details: ConstructionDetails, style: string): Promise<{url: string, label: string}[]> => {
-  const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || 
-                 process.env.GEMINI_API_KEY || 
-                 process.env.API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
 
   if (!apiKey || apiKey === 'undefined' || apiKey === '') {
     console.error("Gemini API Key is missing.");

@@ -132,7 +132,7 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ user, projects, o
       ]) as {url: string, style: string}[];
       
       if (options.length === 0) {
-        alert("AI Design generation timed out or failed. Please check your API key and try again.");
+        alert("AI Design generation failed. Possible reasons:\n1. API Key is invalid or missing.\n2. Rate limits exceeded.\n3. Safety filters blocked the request.\n\nPlease check your Vercel logs or try again.");
       }
       setAiLayoutOptions(options);
     } catch (error) {
@@ -456,12 +456,23 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ user, projects, o
                     <div className="py-12 text-center bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
                       <i className="fas fa-exclamation-triangle text-4xl text-amber-500 mb-4"></i>
                       <p className="text-slate-600 font-bold mb-6 uppercase tracking-widest text-xs">Generation Failed or Timed Out</p>
-                      <button 
-                        onClick={handleGenerateLayouts}
-                        className="bg-construction-slate text-construction-yellow px-8 py-3 rounded-xl font-black uppercase text-xs tracking-widest hover:bg-black transition-all"
-                      >
-                        Retry Generation
-                      </button>
+                      <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                        <button 
+                          onClick={handleGenerateLayouts}
+                          className="bg-construction-slate text-construction-yellow px-8 py-3 rounded-xl font-black uppercase text-xs tracking-widest hover:bg-black transition-all"
+                        >
+                          Retry Generation
+                        </button>
+                        <button 
+                          onClick={() => {
+                            setAiLayoutOptions([{ url: 'https://picsum.photos/seed/blueprint/800/800', style: 'Sample Layout' }]);
+                            setSelectedLayoutIndex(0);
+                          }}
+                          className="bg-slate-200 text-slate-600 px-8 py-3 rounded-xl font-black uppercase text-xs tracking-widest hover:bg-slate-300 transition-all"
+                        >
+                          Use Sample & Skip
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

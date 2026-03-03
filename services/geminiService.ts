@@ -3,7 +3,13 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { ConstructionDetails, AiEstimateOption } from "../types";
 
 export const getAiEstimateOptions = async (details: ConstructionDetails): Promise<AiEstimateOption[]> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey === 'undefined') {
+    console.error("Gemini API Key is missing. Please set GEMINI_API_KEY in Vercel environment variables.");
+    return [];
+  }
+  
+  const ai = new GoogleGenAI({ apiKey });
   
   const floorBreakdown = details.floorConfigs.map(f => 
     `Floor ${f.floorNumber}: ${f.rooms} Rooms, ${f.bathrooms} Bathrooms, Kitchen: ${f.kitchenType}`
@@ -57,7 +63,13 @@ ${floorBreakdown}
 };
 
 export const generateHouseLayout = async (details: ConstructionDetails, style: string = 'Modernist'): Promise<string | null> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey === 'undefined' || apiKey === '') {
+    console.error("CRITICAL: Gemini API Key is missing in the production environment.");
+    return null;
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
   
   const floorDescriptions = details.floorConfigs.map(f => 
     `Level ${f.floorNumber}: ${f.rooms} rooms, ${f.bathrooms} bathrooms, and a kitchen (${f.kitchenType}).`
@@ -88,16 +100,21 @@ export const generateHouseLayout = async (details: ConstructionDetails, style: s
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image',
+      model: 'gemini-3.1-flash-image-preview',
       contents: {
         parts: [{ text: prompt }],
       },
       config: {
         imageConfig: {
-          aspectRatio: "1:1"
+          aspectRatio: "1:1",
+          imageSize: "1K"
         },
       },
     });
+
+    if (!response.candidates?.[0]?.content?.parts) {
+      throw new Error("No content returned from Gemini");
+    }
 
     for (const part of response.candidates[0].content.parts) {
       if (part.inlineData) {
@@ -118,18 +135,30 @@ export const generateTripleLayouts = async (details: ConstructionDetails): Promi
     { name: 'Eco Minimal', prompt: 'Compact, efficient space optimization with focus on natural flow' }
   ];
 
-  const results = await Promise.all(
-    styles.map(async (style) => {
+  // Run sequentially to avoid rate limits on free API keys
+  const results = [];
+  for (const style of styles) {
+    try {
       const url = await generateHouseLayout(details, style.prompt);
-      return { url: url || '', style: style.name };
-    })
-  );
+      if (url) {
+        results.push({ url, style: style.name });
+      }
+    } catch (err) {
+      console.error(`Failed to generate layout for ${style.name}:`, err);
+    }
+  }
 
-  return results.filter(r => r.url !== r.style && r.url !== '');
+  return results;
 };
 
 export const generateHouseDesigns = async (details: ConstructionDetails, style: string): Promise<{url: string, label: string}[]> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey === 'undefined') {
+    console.error("Gemini API Key is missing.");
+    return [];
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
   
   const prompt = `Create a 2D architectural elevation (exterior view) of a house with the following specs:
     - Style: ${style}

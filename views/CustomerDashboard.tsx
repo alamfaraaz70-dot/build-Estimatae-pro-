@@ -121,9 +121,26 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ user, projects, o
   const handleGenerateLayouts = async () => {
     setGeneratingLayout(true);
     setSelectedLayoutIndex(null);
-    const options = await generateTripleLayouts(details);
-    setAiLayoutOptions(options);
-    setGeneratingLayout(false);
+    
+    // Create a timeout to prevent hanging (increased to 60s for sequential processing)
+    const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve([]), 60000));
+    
+    try {
+      const options = await Promise.race([
+        generateTripleLayouts(details),
+        timeoutPromise
+      ]) as {url: string, style: string}[];
+      
+      if (options.length === 0) {
+        alert("AI Design generation timed out or failed. Please check your API key and try again.");
+      }
+      setAiLayoutOptions(options);
+    } catch (error) {
+      console.error("Layout generation failed:", error);
+      setAiLayoutOptions([]);
+    } finally {
+      setGeneratingLayout(false);
+    }
   };
 
   const handleGenerateDesigns = async () => {
@@ -435,6 +452,17 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ user, projects, o
                   </div>
                   {generatingLayout ? (
                     <div className="py-24 text-center"><i className="fas fa-drafting-compass fa-spin text-7xl text-construction-yellow mb-8"></i><p className="text-sm font-black uppercase tracking-[0.3em] text-slate-600 animate-pulse italic">Synthesizing Dimensional Blueprint...</p></div>
+                  ) : aiLayoutOptions.length === 0 ? (
+                    <div className="py-12 text-center bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
+                      <i className="fas fa-exclamation-triangle text-4xl text-amber-500 mb-4"></i>
+                      <p className="text-slate-600 font-bold mb-6 uppercase tracking-widest text-xs">Generation Failed or Timed Out</p>
+                      <button 
+                        onClick={handleGenerateLayouts}
+                        className="bg-construction-slate text-construction-yellow px-8 py-3 rounded-xl font-black uppercase text-xs tracking-widest hover:bg-black transition-all"
+                      >
+                        Retry Generation
+                      </button>
+                    </div>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       {aiLayoutOptions.map((opt, idx) => (

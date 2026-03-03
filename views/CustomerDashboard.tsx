@@ -285,6 +285,25 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ user, projects, o
                           </div>
                         </div>
                         <div className="flex flex-col">
+                          {p.estimates && p.estimates.length > 0 && (
+                            <div className="grid grid-cols-2 border-t border-slate-200">
+                              <button 
+                                onClick={() => {
+                                  const engineer = allUsers.find(u => u.id === p.estimates[0].engineerId);
+                                  if (engineer) setViewingEngineer(engineer);
+                                }}
+                                className="w-full bg-slate-100 hover:bg-slate-200 text-construction-slate py-4 font-black uppercase tracking-widest transition-all border-r border-slate-200 flex items-center justify-center gap-2 text-[10px]"
+                              >
+                                <i className="fas fa-user-tie"></i> Credentials
+                              </button>
+                              <button 
+                                onClick={() => setActiveChatId(p.id)}
+                                className="w-full bg-construction-slate text-construction-yellow py-4 font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 text-[10px] hover:bg-black"
+                              >
+                                <i className="fas fa-comments"></i> Chat with Engineer
+                              </button>
+                            </div>
+                          )}
                           {p.status === ProjectStatus.APPROVED && (
                             <button onClick={() => handleFinalizeProject(p)} className="w-full bg-green-600 hover:bg-green-700 text-white py-5 font-black uppercase tracking-widest transition-all">Finalize & Deploy</button>
                           )}
@@ -468,6 +487,7 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ user, projects, o
 
       {showSuccessOverlay && <SuccessTick message="Order Sent to Engineer" subMessage="Review sent for verification" />}
       {previewImageUrl && <ImagePreviewModal url={previewImageUrl} onClose={() => setPreviewImageUrl(null)} title="Architectural Site Layout" />}
+      {viewingEngineer && <EngineerProfileViewModal engineer={viewingEngineer} onClose={() => setViewingEngineer(null)} />}
     </div>
   );
 };

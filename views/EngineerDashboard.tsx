@@ -165,7 +165,15 @@ const EngineerDashboard: React.FC<EngineerDashboardProps> = ({ user, projects, o
                       {p.status === ProjectStatus.SUBMITTED ? (
                         <button onClick={() => setSelectedProject(p)} className="bg-construction-yellow text-construction-slate py-4 rounded-xl font-black uppercase text-xs shadow-lg hover:translate-y-[-2px] transition-all">Create Estimate</button>
                       ) : (
-                        <div className="p-4 bg-green-50 rounded-xl border border-green-100 text-center"><p className="text-[10px] font-black text-green-700 uppercase">Quote Dispatched</p></div>
+                        <div className="flex flex-col gap-2">
+                          <div className="p-4 bg-green-50 rounded-xl border border-green-100 text-center"><p className="text-[10px] font-black text-green-700 uppercase">Quote Dispatched</p></div>
+                          <button 
+                            onClick={() => setActiveChatId(p.id)}
+                            className="w-full bg-construction-slate text-construction-yellow py-3 rounded-xl font-black uppercase text-[10px] shadow-lg hover:translate-y-[-2px] transition-all flex items-center justify-center gap-2"
+                          >
+                            <i className="fas fa-comments"></i> Chat with Customer
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>

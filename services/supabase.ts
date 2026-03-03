@@ -2,8 +2,8 @@
 import { createClient } from '@supabase/supabase-js';
 import { User, Project } from '../types';
 
-const SUPABASE_URL = 'https://ukbgayoirtpqfhroowix.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_zf8N5QVj85gpkBuRyXptyQ_I5TmR5Mo';
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://ukbgayoirtpqfhroowix.supabase.co';
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_zf8N5QVj85gpkBuRyXptyQ_I5TmR5Mo';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -27,7 +27,8 @@ export const supabaseService = {
       createdAt: p.created_at,
       customerName: p.customer_name,
       customerId: p.customer_id,
-      selectedLayoutUrl: p.selected_layout_url // Map from DB snake_case
+      selectedLayoutUrl: p.selected_layout_url,
+      selectedDesignUrl: p.selected_design_url
     }));
   },
 
@@ -45,7 +46,8 @@ export const supabaseService = {
       estimates: project.estimates,
       messages: project.messages,
       created_at: project.createdAt,
-      selected_layout_url: project.selectedLayoutUrl // Sync to DB snake_case
+      selected_layout_url: project.selectedLayoutUrl,
+      selected_design_url: project.selectedDesignUrl
     };
 
     const { error } = await supabase

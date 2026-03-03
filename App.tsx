@@ -24,6 +24,7 @@ const AppContent: React.FC = () => {
   const [users, setUsers] = useState<User[]>(initialUsers);
   const [projects, setProjects] = useState<Project[]>(initialProjects);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   // Modal States
   const [isFieldBotOpen, setIsFieldBotOpen] = useState(false);
@@ -42,16 +43,27 @@ const AppContent: React.FC = () => {
   // Load data from Supabase on start
   useEffect(() => {
     const loadData = async () => {
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Sync Timeout')), 10000)
+      );
+
       try {
-        const [dbUsers, dbProjects] = await Promise.all([
-          supabaseService.getUsers(),
-          supabaseService.getProjects()
+        const result = await Promise.race([
+          Promise.all([
+            supabaseService.getUsers(),
+            supabaseService.getProjects()
+          ]),
+          timeoutPromise
         ]);
 
-        if (dbUsers.length > 0) setUsers(dbUsers);
-        if (dbProjects.length > 0) setProjects(dbProjects);
+        if (Array.isArray(result)) {
+          const [dbUsers, dbProjects] = result as [User[], Project[]];
+          if (dbUsers && dbUsers.length > 0) setUsers(dbUsers);
+          if (dbProjects && dbProjects.length > 0) setProjects(dbProjects);
+        }
       } catch (err) {
-        console.error('Supabase load failed, falling back to local data', err);
+        console.warn('Supabase sync issue:', err instanceof Error ? err.message : 'Unknown error');
+        setSyncError('Database connection slow. Using local cache.');
       } finally {
         setIsInitialLoad(false);
       }
@@ -102,10 +114,21 @@ const AppContent: React.FC = () => {
   const renderContent = () => {
     if (isInitialLoad) {
       return (
-        <div className="flex-grow flex items-center justify-center bg-slate-50">
-           <div className="text-center">
-             <i className="fas fa-cog fa-spin text-4xl text-construction-yellow mb-4"></i>
-             <p className="font-black uppercase tracking-widest text-construction-slate italic">Synchronizing with Site Database...</p>
+        <div className="flex-grow flex flex-col items-center justify-center bg-slate-50 p-6">
+           <div className="text-center max-w-md">
+             <div className="relative mb-8">
+               <i className="fas fa-cog fa-spin text-6xl text-construction-yellow"></i>
+               <i className="fas fa-database absolute -bottom-2 -right-2 text-2xl text-construction-slate"></i>
+             </div>
+             <h2 className="text-2xl font-black text-construction-slate uppercase italic mb-2 tracking-tighter">Synchronizing Site Data</h2>
+             <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px] mb-8 animate-pulse">Establishing Secure Connection to Registry...</p>
+             
+             <button 
+               onClick={() => setIsInitialLoad(false)}
+               className="bg-white border-2 border-slate-200 text-slate-400 hover:text-construction-slate hover:border-construction-yellow px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all shadow-sm"
+             >
+               Skip & Use Offline Mode
+             </button>
            </div>
         </div>
       );

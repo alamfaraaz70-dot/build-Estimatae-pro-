@@ -103,6 +103,17 @@ export interface Project {
   layoutHistory?: LayoutArchive[];
 }
 
+export interface OptimizationSuggestion {
+  id: string;
+  title: string;
+  description: string;
+  originalCost: number;
+  optimizedCost: number;
+  savings: number;
+  changes: string[];
+  updatedDetails: ConstructionDetails;
+}
+
 export interface AuthState {
   user: User | null;
   isAuthenticated: boolean;

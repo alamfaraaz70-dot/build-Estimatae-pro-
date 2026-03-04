@@ -6,6 +6,7 @@ import { generateTripleLayouts, generateHouseDesigns } from '../services/geminiS
 import EngineerProfileViewModal from '../components/EngineerProfileViewModal';
 import ImagePreviewModal from '../components/ImagePreviewModal';
 import SuccessTick from '../components/SuccessTick';
+import PaymentModal from '../components/PaymentModal';
 
 interface CustomerDashboardProps {
   user: User;
@@ -46,6 +47,8 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ user, projects, o
   const [viewingHistoryProject, setViewingHistoryProject] = useState<Project | null>(null);
   const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
   const [showAdvancedSpecs, setShowAdvancedSpecs] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [projectToFinalize, setProjectToFinalize] = useState<Project | null>(null);
   
   const [details, setDetails] = useState<ConstructionDetails>({
     plotArea: 1000,
@@ -101,10 +104,15 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ user, projects, o
   const handleNext = async () => {
     if (step === 3) {
       setStep(4);
-      handleGenerateLayouts();
+      // Small delay to allow UI to transition to Step 4 before starting heavy generation
+      setTimeout(() => {
+        handleGenerateLayouts();
+      }, 100);
     } else if (step === 4) {
       setStep(5);
-      handleGenerateDesigns();
+      setTimeout(() => {
+        handleGenerateDesigns();
+      }, 100);
     } else {
       setStep(prev => prev + 1);
     }
@@ -122,8 +130,8 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ user, projects, o
     setGeneratingLayout(true);
     setSelectedLayoutIndex(null);
     
-    // Create a timeout to prevent hanging (increased to 60s for sequential processing)
-    const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve([]), 60000));
+    // Create a timeout to prevent hanging (increased to 90s for safety)
+    const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve([]), 90000));
     
     try {
       const options = await Promise.race([
@@ -131,9 +139,6 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ user, projects, o
         timeoutPromise
       ]) as {url: string, style: string}[];
       
-      if (options.length === 0) {
-        alert("AI Design generation failed. Possible reasons:\n1. API Key is invalid or missing.\n2. Rate limits exceeded.\n3. Safety filters blocked the request.\n\nPlease check your Vercel logs or try again.");
-      }
       setAiLayoutOptions(options);
     } catch (error) {
       console.error("Layout generation failed:", error);
@@ -207,8 +212,19 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ user, projects, o
   };
 
   const handleFinalizeProject = (project: Project) => {
-    const updated: Project = { ...project, status: ProjectStatus.FINALIZED };
+    setProjectToFinalize(project);
+    setShowPaymentModal(true);
+  };
+
+  const handlePaymentSuccess = (method: string) => {
+    if (!projectToFinalize) return;
+    const updated: Project = { ...projectToFinalize, status: ProjectStatus.FINALIZED };
     onUpdateProject(updated);
+    setShowPaymentModal(false);
+    setProjectToFinalize(null);
+    
+    setShowSuccessOverlay(true);
+    setTimeout(() => setShowSuccessOverlay(false), 3500);
   };
 
   const handleSendMessage = (projectId: string, msgData: Partial<ChatMessage>) => {
@@ -321,8 +337,45 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ user, projects, o
                               </button>
                             </div>
                           )}
+                          
+                          {p.estimates && p.estimates.length > 0 && p.status === ProjectStatus.APPROVED && (
+                            <div className="p-6 bg-amber-50 border-t-2 border-amber-100">
+                              <div className="flex items-center gap-2 mb-4">
+                                <i className="fas fa-file-invoice-dollar text-amber-600"></i>
+                                <h4 className="text-[10px] font-black uppercase tracking-widest text-amber-800">Engineer's Official Estimate</h4>
+                              </div>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="bg-white p-3 rounded-xl border border-amber-200">
+                                  <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Material Cost</p>
+                                  <p className="text-lg font-black text-slate-800">{formatCurrency(p.estimates[0].materialCost)}</p>
+                                </div>
+                                <div className="bg-white p-3 rounded-xl border border-amber-200">
+                                  <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Labour Cost</p>
+                                  <p className="text-lg font-black text-slate-800">{formatCurrency(p.estimates[0].laborCost)}</p>
+                                </div>
+                              </div>
+                              <div className="mt-4 pt-4 border-t border-amber-200 flex justify-between items-center">
+                                <div>
+                                  <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Total Project Value</p>
+                                  <p className="text-xl font-black text-construction-slate">{formatCurrency(p.estimates[0].materialCost + p.estimates[0].laborCost)}</p>
+                                </div>
+                                {p.estimates[0].tokenAmount && (
+                                  <div className="text-right">
+                                    <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Token to Start</p>
+                                    <p className="text-lg font-black text-green-600">{formatCurrency(p.estimates[0].tokenAmount)}</p>
+                                  </div>
+                                )}
+                              </div>
+                              {p.estimates[0].message && (
+                                <div className="mt-4 p-3 bg-white/50 rounded-lg border border-amber-100 italic text-[10px] text-slate-600">
+                                  "{p.estimates[0].message}"
+                                </div>
+                              )}
+                            </div>
+                          )}
+
                           {p.status === ProjectStatus.APPROVED && (
-                            <button onClick={() => handleFinalizeProject(p)} className="w-full bg-green-600 hover:bg-green-700 text-white py-5 font-black uppercase tracking-widest transition-all">Finalize & Deploy</button>
+                            <button onClick={() => handleFinalizeProject(p)} className="w-full bg-green-600 hover:bg-green-700 text-white py-5 font-black uppercase tracking-widest transition-all">Finalize & Pay the Token Amount</button>
                           )}
                         </div>
                       </div>
@@ -524,9 +577,16 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ user, projects, o
         </div>
       )}
 
-      {showSuccessOverlay && <SuccessTick message="Order Sent to Engineer" subMessage="Review sent for verification" />}
+      {showSuccessOverlay && <SuccessTick message="Deployment Initialized" subMessage="Site construction has been finalized" />}
       {previewImageUrl && <ImagePreviewModal url={previewImageUrl} onClose={() => setPreviewImageUrl(null)} title="Architectural Site Layout" />}
       {viewingEngineer && <EngineerProfileViewModal engineer={viewingEngineer} onClose={() => setViewingEngineer(null)} />}
+      
+      <PaymentModal 
+        isOpen={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        onSelect={handlePaymentSuccess}
+        amount={projectToFinalize?.estimates?.[0]?.tokenAmount || 0}
+      />
     </div>
   );
 };

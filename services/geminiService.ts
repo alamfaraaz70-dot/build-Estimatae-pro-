@@ -3,7 +3,9 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { ConstructionDetails, AiEstimateOption } from "../types";
 
 export const getAiEstimateOptions = async (details: ConstructionDetails): Promise<AiEstimateOption[]> => {
-  const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+  const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || 
+                 process.env.GEMINI_API_KEY || 
+                 process.env.API_KEY;
 
   if (!apiKey || apiKey === 'undefined' || apiKey === '') {
     const msg = "Gemini API Key is missing. Please set VITE_GEMINI_API_KEY in Vercel.";
@@ -65,10 +67,14 @@ ${floorBreakdown}
 };
 
 export const generateHouseLayout = async (details: ConstructionDetails, style: string = 'Modernist'): Promise<string | null> => {
-  const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+  // Primary source: import.meta.env.VITE_GEMINI_API_KEY (Vite standard)
+  // Fallback: process.env (Vercel/Node standard)
+  const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || 
+                 process.env.GEMINI_API_KEY || 
+                 process.env.API_KEY;
 
   if (!apiKey || apiKey === 'undefined' || apiKey === '') {
-    console.error("CRITICAL: Gemini API Key is missing.");
+    console.error("CRITICAL: Gemini API Key is missing for blueprint generation.");
     return null;
   }
 
@@ -93,16 +99,16 @@ export const generateHouseLayout = async (details: ConstructionDetails, style: s
     STRUCTURAL MANDATE:
     - You MUST include a clear STAIRCASE layout on EVERY floor plan.
     - The stairs should be positioned to provide internal access between all floors.
+    - For ${details.floors} floors, you MUST display ALL levels (Ground Floor, 1st Floor, etc.) side-by-side or stacked in one single image.
+    - DO NOT show just one floor. Show ALL ${details.floors} floors clearly labeled.
     
     VISUAL REQUIREMENTS: 
-    - For ${details.floors} floors, display ALL levels side-by-side or stacked in one sheet.
-    - Label each section clearly: "Ground Floor", "1st Floor", etc.
     - Black and white technical line drawing. High precision.
     - Show door swings, window positions, and structural columns.
+    - Label each section clearly: "Ground Floor", "1st Floor", etc.
     - IMPORTANT: Ensure the external boundary reflects the ${details.length}x${details.breadth} proportions if specified.`;
 
   try {
-    // Using gemini-2.5-flash-image for maximum compatibility across all regions and key types
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
       contents: {
@@ -138,24 +144,28 @@ export const generateTripleLayouts = async (details: ConstructionDetails): Promi
     { name: 'Eco Minimal', prompt: 'Compact, efficient space optimization with focus on natural flow' }
   ];
 
-  // Run sequentially to avoid rate limits on free API keys
-  const results = [];
-  for (const style of styles) {
+  // Run in parallel to avoid timeouts, but with a small delay to respect free tier limits if any
+  const results = await Promise.all(styles.map(async (style, index) => {
     try {
+      // Add a small staggered delay for parallel requests
+      await new Promise(resolve => setTimeout(resolve, index * 1500));
       const url = await generateHouseLayout(details, style.prompt);
       if (url) {
-        results.push({ url, style: style.name });
+        return { url, style: style.name };
       }
     } catch (err) {
       console.error(`Failed to generate layout for ${style.name}:`, err);
     }
-  }
+    return null;
+  }));
 
-  return results;
+  return results.filter((r): r is {url: string, style: string} => r !== null);
 };
 
 export const generateHouseDesigns = async (details: ConstructionDetails, style: string): Promise<{url: string, label: string}[]> => {
-  const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+  const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || 
+                 process.env.GEMINI_API_KEY || 
+                 process.env.API_KEY;
 
   if (!apiKey || apiKey === 'undefined' || apiKey === '') {
     console.error("Gemini API Key is missing.");
@@ -206,6 +216,66 @@ export const generateHouseDesigns = async (details: ConstructionDetails, style: 
     return results.filter((r): r is {url: string, label: string} => r !== null);
   } catch (error) {
     console.error("Gemini Design Generation Error:", error);
+    return [];
+  }
+};
+
+export const getBudgetOptimizations = async (
+  details: ConstructionDetails,
+  currentEstimate: AiEstimateOption,
+  targetBudget: number
+): Promise<any[]> => {
+  const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || 
+                 process.env.GEMINI_API_KEY || 
+                 process.env.API_KEY;
+
+  if (!apiKey || apiKey === 'undefined' || apiKey === '') return [];
+
+  const ai = new GoogleGenAI({ apiKey });
+  
+  const prompt = `The user is over budget for their house construction.
+    Target Budget: ₹${targetBudget.toLocaleString()}
+    Current Estimate: ₹${(currentEstimate.material + currentEstimate.labor).toLocaleString()}
+    
+    Specs: ${details.floors} floors, ${details.plotArea} sq ft, Location: ${details.location}
+    
+    Provide 3 distinct optimization strategies to bring the cost closer to the target budget.
+    Each strategy should include:
+    - A catchy title
+    - A brief description
+    - 3-4 specific changes/sacrifices
+    - The new estimated total cost
+    - Total savings
+    
+    Return as a JSON array.`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              id: { type: Type.STRING },
+              title: { type: Type.STRING },
+              description: { type: Type.STRING },
+              changes: { type: Type.ARRAY, items: { type: Type.STRING } },
+              optimizedCost: { type: Type.NUMBER },
+              savings: { type: Type.NUMBER },
+            },
+            required: ["id", "title", "description", "changes", "optimizedCost", "savings"],
+          }
+        },
+      },
+    });
+
+    return JSON.parse(response.text?.trim() || "[]");
+  } catch (error) {
+    console.error("Budget Optimization Error:", error);
     return [];
   }
 };

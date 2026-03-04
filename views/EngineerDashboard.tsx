@@ -200,6 +200,25 @@ const EngineerDashboard: React.FC<EngineerDashboardProps> = ({ user, projects, o
                           </div>
                         </div>
                       </div>
+
+                      <div className="mb-8 p-6 bg-slate-50 rounded-2xl border-2 border-slate-100">
+                        <label className="block text-[10px] font-black text-slate-500 uppercase mb-4 ml-1 tracking-widest">Required Booking Token (Advance %)</label>
+                        <div className="grid grid-cols-3 gap-4">
+                          {[5, 8, 10].map(pct => (
+                            <button
+                              key={pct}
+                              type="button"
+                              onClick={() => setTokenPercentage(pct)}
+                              className={`py-4 rounded-xl font-black text-sm transition-all border-2 ${tokenPercentage === pct ? 'bg-construction-yellow border-construction-slate text-construction-slate shadow-lg' : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300'}`}
+                            >
+                              {pct}%
+                            </button>
+                          ))}
+                        </div>
+                        <p className="mt-4 text-[9px] font-bold text-slate-400 uppercase tracking-wider text-center">
+                          Estimated Advance: {formatCurrency(Math.round((Number(materialCost) + Number(laborCost)) * (tokenPercentage / 100)))}
+                        </p>
+                      </div>
                       <textarea className={inputClasses + " mb-6 h-24"} placeholder="Site notes & professional recommendations..." value={message} onChange={e => setMessage(e.target.value)} />
                       <button type="submit" className="w-full bg-construction-slate text-construction-yellow py-4 rounded-xl font-black uppercase tracking-widest hover:bg-black">Submit Final Review</button>
                     </form>

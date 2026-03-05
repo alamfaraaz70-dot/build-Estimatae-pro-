@@ -127,11 +127,17 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ user, projects, o
   };
 
   const handleGenerateLayouts = async () => {
+    // Check for API key if using premium models
+    if (window.aistudio && !(await window.aistudio.hasSelectedApiKey())) {
+      await window.aistudio.openSelectKey();
+      // After opening, we proceed. The platform handles the key injection.
+    }
+
     setGeneratingLayout(true);
     setSelectedLayoutIndex(null);
     
-    // Create a timeout to prevent hanging (increased to 90s for safety)
-    const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve([]), 90000));
+    // Create a timeout to prevent hanging (increased to 120s for sequential generation)
+    const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve([]), 120000));
     
     try {
       const options = await Promise.race([
@@ -150,6 +156,12 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ user, projects, o
 
   const handleGenerateDesigns = async () => {
     if (selectedLayoutIndex === null) return;
+
+    // Check for API key if using premium models
+    if (window.aistudio && !(await window.aistudio.hasSelectedApiKey())) {
+      await window.aistudio.openSelectKey();
+    }
+
     setGeneratingDesigns(true);
     setSelectedDesignIndex(null);
     const designs = await generateHouseDesigns(details, aiLayoutOptions[selectedLayoutIndex].style);

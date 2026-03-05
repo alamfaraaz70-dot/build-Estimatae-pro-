@@ -131,7 +131,21 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ user, onClose, onUpdate }) 
               />
             </div>
 
-            <div className="pt-2 border-t-2 border-slate-100">
+            <div className="pt-2 border-t-2 border-slate-100 space-y-3">
+               <button 
+                  onClick={async () => {
+                    if (window.aistudio) {
+                      await window.aistudio.openSelectKey();
+                    } else {
+                      alert("API Key selection is only available in the AI Studio environment.");
+                    }
+                  }}
+                  className="flex items-center gap-3 w-full p-3 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors border-2 border-blue-100"
+               >
+                  <i className="fas fa-key text-lg"></i>
+                  <span className="text-xs font-black uppercase tracking-wider">Manage / Change API Key</span>
+               </button>
+
                <button 
                   onClick={() => alert("Connecting to Support Engineering Team...")}
                   className="flex items-center gap-3 w-full p-3 rounded bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors border-2 border-amber-100"

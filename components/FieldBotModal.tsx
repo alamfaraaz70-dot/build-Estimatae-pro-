@@ -36,6 +36,11 @@ const FieldBotModal: React.FC<FieldBotModalProps> = ({ onClose }) => {
     setLoading(true);
 
     try {
+      // Check for API key if using premium models or if the default is exhausted
+      if (window.aistudio && !(await window.aistudio.hasSelectedApiKey())) {
+        await window.aistudio.openSelectKey();
+      }
+
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
@@ -140,9 +145,20 @@ const FieldBotModal: React.FC<FieldBotModalProps> = ({ onClose }) => {
               <p className="text-construction-yellow text-[9px] font-black uppercase tracking-[0.2em]">Live Engineering Intelligence</p>
             </div>
           </div>
-          <button onClick={onClose} className="text-white/40 hover:text-white transition-colors">
-            <i className="fas fa-times-circle text-2xl"></i>
-          </button>
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={async () => {
+                if (window.aistudio) await window.aistudio.openSelectKey();
+              }}
+              className="text-[9px] font-black uppercase tracking-widest bg-white/10 hover:bg-white/20 text-construction-yellow px-2 py-1 rounded border border-construction-yellow/30 transition-all"
+              title="Change API Key if limits are reached"
+            >
+              <i className="fas fa-key mr-1"></i> Key
+            </button>
+            <button onClick={onClose} className="text-white/40 hover:text-white transition-colors">
+              <i className="fas fa-times-circle text-2xl"></i>
+            </button>
+          </div>
         </div>
 
         <div ref={scrollRef} className="flex-grow overflow-y-auto p-6 space-y-4 construction-grid bg-slate-50">

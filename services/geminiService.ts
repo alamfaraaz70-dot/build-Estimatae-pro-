@@ -67,11 +67,16 @@ ${floorBreakdown}
 };
 
 export const generateHouseLayout = async (details: ConstructionDetails, style: string = 'Modernist'): Promise<string | null> => {
-  // Primary source: import.meta.env.VITE_GEMINI_API_KEY (Vite standard)
-  // Fallback: process.env (Vercel/Node standard)
-  const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || 
-                 process.env.GEMINI_API_KEY || 
-                 process.env.API_KEY;
+  // Robust API key retrieval for Vite environment
+  let apiKey = '';
+  try {
+    apiKey = (process.env.GEMINI_API_KEY as string) || 
+             (process.env.API_KEY as string) || 
+             (import.meta as any).env?.VITE_GEMINI_API_KEY || 
+             '';
+  } catch (e) {
+    apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || '';
+  }
 
   if (!apiKey || apiKey === 'undefined' || apiKey === '') {
     console.error("CRITICAL: Gemini API Key is missing for blueprint generation.");
@@ -109,27 +114,33 @@ export const generateHouseLayout = async (details: ConstructionDetails, style: s
     - IMPORTANT: Ensure the external boundary reflects the ${details.length}x${details.breadth} proportions if specified.`;
 
   try {
+    console.log(`Starting layout generation for style: ${style}...`);
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image',
+      model: 'gemini-3.1-flash-image-preview',
       contents: {
         parts: [{ text: prompt }],
       },
       config: {
         imageConfig: {
-          aspectRatio: "1:1"
+          aspectRatio: "1:1",
+          imageSize: "1K"
         },
       },
     });
 
     if (!response.candidates?.[0]?.content?.parts) {
-      throw new Error("No content returned from Gemini");
+      console.warn(`No candidates returned for style: ${style}. Finish reason: ${response.candidates?.[0]?.finishReason}`);
+      return null;
     }
 
     for (const part of response.candidates[0].content.parts) {
       if (part.inlineData) {
+        console.log(`Successfully generated layout for style: ${style}`);
         return `data:image/png;base64,${part.inlineData.data}`;
       }
     }
+    
+    console.warn(`No inlineData found in response for style: ${style}. Parts:`, response.candidates[0].content.parts);
     return null;
   } catch (error) {
     console.error(`Gemini Image Generation Error (${style}):`, error);
@@ -144,28 +155,46 @@ export const generateTripleLayouts = async (details: ConstructionDetails): Promi
     { name: 'Eco Minimal', prompt: 'Compact, efficient space optimization with focus on natural flow' }
   ];
 
-  // Run in parallel to avoid timeouts, but with a small delay to respect free tier limits if any
-  const results = await Promise.all(styles.map(async (style, index) => {
+  const results: ({url: string, style: string} | null)[] = [];
+  
+  console.log("Starting triple layout generation...");
+  
+  // Run sequentially to avoid rate limits and ensure better reliability
+  for (let i = 0; i < styles.length; i++) {
+    const style = styles[i];
     try {
-      // Add a small staggered delay for parallel requests
-      await new Promise(resolve => setTimeout(resolve, index * 1500));
       const url = await generateHouseLayout(details, style.prompt);
       if (url) {
-        return { url, style: style.name };
+        results.push({ url, style: style.name });
+      } else {
+        results.push(null);
       }
     } catch (err) {
       console.error(`Failed to generate layout for ${style.name}:`, err);
+      results.push(null);
     }
-    return null;
-  }));
+    
+    // Small delay between requests even in sequential mode
+    if (i < styles.length - 1) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+  }
 
-  return results.filter((r): r is {url: string, style: string} => r !== null);
+  const finalResults = results.filter((r): r is {url: string, style: string} => r !== null);
+  console.log(`Triple layout generation complete. Success count: ${finalResults.length}`);
+  return finalResults;
 };
 
 export const generateHouseDesigns = async (details: ConstructionDetails, style: string): Promise<{url: string, label: string}[]> => {
-  const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || 
-                 process.env.GEMINI_API_KEY || 
-                 process.env.API_KEY;
+  let apiKey = '';
+  try {
+    apiKey = (process.env.GEMINI_API_KEY as string) || 
+             (process.env.API_KEY as string) || 
+             (import.meta as any).env?.VITE_GEMINI_API_KEY || 
+             '';
+  } catch (e) {
+    apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || '';
+  }
 
   if (!apiKey || apiKey === 'undefined' || apiKey === '') {
     console.error("Gemini API Key is missing.");
@@ -188,32 +217,45 @@ export const generateHouseDesigns = async (details: ConstructionDetails, style: 
     - The image should look like a professional design proposal for a client.`;
 
   const labels = ["Front Elevation", "Side Perspective", "Modern Concept"];
+  const results: ({url: string, label: string} | null)[] = [];
   
   try {
-    const results = await Promise.all(
-      [1, 2, 3].map(async (_, i) => {
-        const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash-image',
-          contents: {
-            parts: [{ text: `${prompt} (Variation ${i + 1}: ${labels[i]})` }],
+    console.log("Starting house design generation...");
+    for (let i = 0; i < 3; i++) {
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.1-flash-image-preview',
+        contents: {
+          parts: [{ text: `${prompt} (Variation ${i + 1}: ${labels[i]})` }],
+        },
+        config: {
+          imageConfig: {
+            aspectRatio: "16:9",
+            imageSize: "1K"
           },
-          config: {
-            imageConfig: {
-              aspectRatio: "16:9"
-            },
-          },
-        });
+        },
+      });
 
+      let found = false;
+      if (response.candidates?.[0]?.content?.parts) {
         for (const part of response.candidates[0].content.parts) {
           if (part.inlineData) {
-            return { url: `data:image/png;base64,${part.inlineData.data}`, label: labels[i] };
+            results.push({ url: `data:image/png;base64,${part.inlineData.data}`, label: labels[i] });
+            found = true;
+            break;
           }
         }
-        return null;
-      })
-    );
+      }
+      if (!found) {
+        console.warn(`No design generated for variation ${i + 1}`);
+        results.push(null);
+      }
+      
+      if (i < 2) await new Promise(resolve => setTimeout(resolve, 2000));
+    }
 
-    return results.filter((r): r is {url: string, label: string} => r !== null);
+    const finalResults = results.filter((r): r is {url: string, label: string} => r !== null);
+    console.log(`House design generation complete. Success count: ${finalResults.length}`);
+    return finalResults;
   } catch (error) {
     console.error("Gemini Design Generation Error:", error);
     return [];

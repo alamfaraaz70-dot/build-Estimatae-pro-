@@ -66,6 +66,93 @@ ${floorBreakdown}
   }
 };
 
+export const getFallbackInteriors = (details: ConstructionDetails): {url: string, style: string}[] => {
+  return [
+    { 
+      url: 'https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&q=80&w=800', 
+      style: 'Modern Minimalist Interior (Sample)' 
+    },
+    { 
+      url: 'https://images.unsplash.com/photo-1616489953149-7551745d43ac?auto=format&fit=crop&q=80&w=800', 
+      style: 'Contemporary Luxury Interior (Sample)' 
+    },
+    { 
+      url: 'https://images.unsplash.com/photo-1616137422495-1e9e46e2aa77?auto=format&fit=crop&q=80&w=800', 
+      style: 'Industrial Chic Interior (Sample)' 
+    }
+  ];
+};
+
+export const generateInteriorDesigns = async (details: ConstructionDetails): Promise<{url: string, style: string}[]> => {
+  const styles = [
+    { name: 'Modern Minimalist', prompt: 'Modern minimalist living room with clean lines and neutral tones' },
+    { name: 'Luxury Contemporary', prompt: 'High-end contemporary interior with premium finishes and lighting' },
+    { name: 'Industrial Chic', prompt: 'Industrial style interior with exposed brick and metal accents' }
+  ];
+
+  let apiKey = '';
+  try {
+    apiKey = (process.env.GEMINI_API_KEY as string) || 
+             (process.env.API_KEY as string) || 
+             (import.meta as any).env?.VITE_GEMINI_API_KEY || 
+             '';
+  } catch (e) {
+    apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || '';
+  }
+
+  if (!apiKey || apiKey === 'undefined' || apiKey === '') {
+    return getFallbackInteriors(details);
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
+  const results: ({url: string, style: string} | null)[] = [];
+  
+  console.log("Starting interior design generation...");
+  
+  for (let i = 0; i < styles.length; i++) {
+    const style = styles[i];
+    try {
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.1-flash-image-preview',
+        contents: {
+          parts: [{ text: `Create a high-quality 3D architectural interior rendering of a ${style.prompt}. The design should feel spacious and professional.` }],
+        },
+        config: {
+          imageConfig: {
+            aspectRatio: "16:9",
+            imageSize: "1K"
+          },
+        },
+      });
+
+      let found = false;
+      if (response.candidates?.[0]?.content?.parts) {
+        for (const part of response.candidates[0].content.parts) {
+          if (part.inlineData) {
+            results.push({ url: `data:image/png;base64,${part.inlineData.data}`, style: style.name });
+            found = true;
+            break;
+          }
+        }
+      }
+      if (!found) results.push(null);
+    } catch (err) {
+      console.error(`Failed to generate interior for ${style.name}:`, err);
+      results.push(null);
+    }
+    
+    if (i < styles.length - 1) await new Promise(resolve => setTimeout(resolve, 2000));
+  }
+
+  const finalResults = results.filter((r): r is {url: string, style: string} => r !== null);
+  
+  if (finalResults.length === 0) {
+    return getFallbackInteriors(details);
+  }
+
+  return finalResults;
+};
+
 export const generateHouseLayout = async (details: ConstructionDetails, style: string = 'Modernist'): Promise<string | null> => {
   // Robust API key retrieval for Vite environment
   let apiKey = '';
@@ -148,6 +235,32 @@ export const generateHouseLayout = async (details: ConstructionDetails, style: s
   }
 };
 
+export const getFallbackLayouts = (details: ConstructionDetails): {url: string, style: string}[] => {
+  return [
+    { 
+      url: 'https://images.unsplash.com/photo-1580137189272-c9379f8864fd?auto=format&fit=crop&q=80&w=800', 
+      style: 'Standard Site Strategy (Sample)' 
+    },
+    { 
+      url: 'https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&q=80&w=800', 
+      style: 'Optimized Urban Layout (Sample)' 
+    }
+  ];
+};
+
+export const getFallbackDesigns = (details: ConstructionDetails): {url: string, label: string}[] => {
+  return [
+    { 
+      url: 'https://images.unsplash.com/photo-1518780664697-55e3ad937233?auto=format&fit=crop&q=80&w=800', 
+      label: 'Contemporary Elevation (Sample)' 
+    },
+    { 
+      url: 'https://images.unsplash.com/photo-1583608205776-bfd35f0d9f83?auto=format&fit=crop&q=80&w=800', 
+      label: 'Modern Villa Concept (Sample)' 
+    }
+  ];
+};
+
 export const generateTripleLayouts = async (details: ConstructionDetails): Promise<{url: string, style: string}[]> => {
   const styles = [
     { name: 'Modernist Edge', prompt: 'Modern minimalist luxury with open-plan concepts' },
@@ -181,6 +294,13 @@ export const generateTripleLayouts = async (details: ConstructionDetails): Promi
   }
 
   const finalResults = results.filter((r): r is {url: string, style: string} => r !== null);
+  
+  // FALLBACK LOGIC: If AI fails, provide professional samples so the process continues
+  if (finalResults.length === 0) {
+    console.warn("AI Generation limited. Deploying professional site samples.");
+    return getFallbackLayouts(details);
+  }
+
   console.log(`Triple layout generation complete. Success count: ${finalResults.length}`);
   return finalResults;
 };
@@ -254,11 +374,18 @@ export const generateHouseDesigns = async (details: ConstructionDetails, style: 
     }
 
     const finalResults = results.filter((r): r is {url: string, label: string} => r !== null);
+    
+    // FALLBACK LOGIC: If AI fails, provide professional samples
+    if (finalResults.length === 0) {
+      console.warn("AI Design limited. Deploying professional elevation samples.");
+      return getFallbackDesigns(details);
+    }
+
     console.log(`House design generation complete. Success count: ${finalResults.length}`);
     return finalResults;
   } catch (error) {
     console.error("Gemini Design Generation Error:", error);
-    return [];
+    return getFallbackDesigns(details);
   }
 };
 

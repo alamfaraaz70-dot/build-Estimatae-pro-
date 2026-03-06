@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, Project, ProjectStatus, ConstructionDetails, FloorConfig, Estimate, ChatMessage, LayoutArchive } from '../types';
 import ChatRoom from '../components/ChatRoom';
-import { generateTripleLayouts, generateHouseDesigns } from '../services/geminiService';
+import { generateInteriorDesigns, generateHouseDesigns, getFallbackInteriors, getFallbackDesigns } from '../services/geminiService';
 import EngineerProfileViewModal from '../components/EngineerProfileViewModal';
 import ImagePreviewModal from '../components/ImagePreviewModal';
 import SuccessTick from '../components/SuccessTick';
@@ -35,11 +35,11 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ user, projects, o
   const [showWizard, setShowWizard] = useState(false);
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [generatingLayout, setGeneratingLayout] = useState(false);
+  const [generatingInterior, setGeneratingInterior] = useState(false);
   const [generatingDesigns, setGeneratingDesigns] = useState(false);
-  const [aiLayoutOptions, setAiLayoutOptions] = useState<{url: string, style: string}[]>([]);
+  const [aiInteriorOptions, setAiInteriorOptions] = useState<{url: string, style: string}[]>([]);
   const [houseDesignOptions, setHouseDesignOptions] = useState<{url: string, label: string}[]>([]);
-  const [selectedLayoutIndex, setSelectedLayoutIndex] = useState<number | null>(null);
+  const [selectedInteriorIndex, setSelectedInteriorIndex] = useState<number | null>(null);
   const [selectedDesignIndex, setSelectedDesignIndex] = useState<number | null>(null);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [viewingEngineer, setViewingEngineer] = useState<User | null>(null);
@@ -104,9 +104,8 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ user, projects, o
   const handleNext = async () => {
     if (step === 3) {
       setStep(4);
-      // Small delay to allow UI to transition to Step 4 before starting heavy generation
       setTimeout(() => {
-        handleGenerateLayouts();
+        handleGenerateInteriors();
       }, 100);
     } else if (step === 4) {
       setStep(5);
@@ -126,47 +125,57 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ user, projects, o
     }
   };
 
-  const handleGenerateLayouts = async () => {
-    // Check for API key if using premium models
+  const handleGenerateInteriors = async () => {
     if (window.aistudio && !(await window.aistudio.hasSelectedApiKey())) {
       await window.aistudio.openSelectKey();
-      // After opening, we proceed. The platform handles the key injection.
     }
 
-    setGeneratingLayout(true);
-    setSelectedLayoutIndex(null);
+    setGeneratingInterior(true);
+    setSelectedInteriorIndex(null);
     
-    // Create a timeout to prevent hanging (increased to 120s for sequential generation)
-    const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve([]), 120000));
+    const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve([]), 60000));
     
     try {
       const options = await Promise.race([
-        generateTripleLayouts(details),
+        generateInteriorDesigns(details),
         timeoutPromise
       ]) as {url: string, style: string}[];
       
-      setAiLayoutOptions(options);
+      if (options && options.length > 0) {
+        setAiInteriorOptions(options);
+      } else {
+        setAiInteriorOptions(getFallbackInteriors(details));
+      }
     } catch (error) {
-      console.error("Layout generation failed:", error);
-      setAiLayoutOptions([]);
+      console.error("Interior generation failed:", error);
+      setAiInteriorOptions(getFallbackInteriors(details));
     } finally {
-      setGeneratingLayout(false);
+      setGeneratingInterior(false);
     }
   };
 
   const handleGenerateDesigns = async () => {
-    if (selectedLayoutIndex === null) return;
+    if (selectedInteriorIndex === null) return;
 
-    // Check for API key if using premium models
     if (window.aistudio && !(await window.aistudio.hasSelectedApiKey())) {
       await window.aistudio.openSelectKey();
     }
 
     setGeneratingDesigns(true);
     setSelectedDesignIndex(null);
-    const designs = await generateHouseDesigns(details, aiLayoutOptions[selectedLayoutIndex].style);
-    setHouseDesignOptions(designs);
-    setGeneratingDesigns(false);
+    try {
+      const designs = await generateHouseDesigns(details, aiInteriorOptions[selectedInteriorIndex].style);
+      if (designs && designs.length > 0) {
+        setHouseDesignOptions(designs);
+      } else {
+        setHouseDesignOptions(getFallbackDesigns(details));
+      }
+    } catch (err) {
+      console.error("Design generation failed:", err);
+      setHouseDesignOptions(getFallbackDesigns(details));
+    } finally {
+      setGeneratingDesigns(false);
+    }
   };
 
   const updateFloorConfig = (floorNum: number, field: keyof FloorConfig, value: any) => {
@@ -179,11 +188,11 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ user, projects, o
   };
 
   const handleFinalSubmit = () => {
-    if (selectedLayoutIndex === null) return;
+    if (selectedInteriorIndex === null) return;
 
     setLoading(true);
     
-    const archive: LayoutArchive[] = aiLayoutOptions.map(opt => ({
+    const archive: LayoutArchive[] = aiInteriorOptions.map(opt => ({
       url: opt.url,
       style: opt.style,
       generatedAt: new Date().toISOString(),
@@ -203,7 +212,7 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ user, projects, o
       details,
       estimates: [],
       messages: [],
-      selectedLayoutUrl: aiLayoutOptions[selectedLayoutIndex].url,
+      selectedInteriorUrl: aiInteriorOptions[selectedInteriorIndex].url,
       selectedDesignUrl: selectedDesignIndex !== null ? houseDesignOptions[selectedDesignIndex].url : undefined,
       layoutHistory: archive
     };
@@ -213,9 +222,9 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ user, projects, o
       setShowWizard(false);
       setStep(1);
       setLoading(false);
-      setAiLayoutOptions([]);
+      setAiInteriorOptions([]);
       setHouseDesignOptions([]);
-      setSelectedLayoutIndex(null);
+      setSelectedInteriorIndex(null);
       setSelectedDesignIndex(null);
       
       setShowSuccessOverlay(true);
@@ -296,9 +305,9 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ user, projects, o
                   ) : (
                     projects.map(p => (
                       <div key={p.id} className="bg-white rounded-3xl overflow-hidden shadow-2xl border-b-8 border-construction-slate flex flex-col group hover:-translate-y-2 transition-all duration-300">
-                        {p.selectedLayoutUrl && (
-                          <div className="h-56 overflow-hidden relative border-b-2 border-slate-100 bg-slate-900 cursor-zoom-in" onClick={() => setPreviewImageUrl(p.selectedLayoutUrl || null)}>
-                            <img src={p.selectedLayoutUrl} alt="Selected Design" className="w-full h-full object-cover opacity-90 group-hover:scale-110 transition-transform duration-700" />
+                        {(p.selectedLayoutUrl || p.selectedInteriorUrl) && (
+                          <div className="h-56 overflow-hidden relative border-b-2 border-slate-100 bg-slate-900 cursor-zoom-in" onClick={() => setPreviewImageUrl(p.selectedLayoutUrl || p.selectedInteriorUrl || null)}>
+                            <img src={p.selectedLayoutUrl || p.selectedInteriorUrl} alt="Selected Design" className="w-full h-full object-cover opacity-90 group-hover:scale-110 transition-transform duration-700" />
                             <div className="absolute top-4 right-4 bg-construction-slate text-construction-yellow text-[10px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest shadow-lg">Site Plan ID: {p.id.toUpperCase()}</div>
                           </div>
                         )}
@@ -404,8 +413,8 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ user, projects, o
         <div className="fixed inset-0 z-[160] bg-construction-slate/95 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-5xl rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in duration-200 border-4 border-construction-yellow flex flex-col max-h-[90vh]">
             <div className="bg-construction-slate text-white p-6 flex justify-between items-center">
-              <h3 className="text-xl font-black uppercase tracking-widest italic">Phase {step}: Site Configuration</h3>
-              <button onClick={() => {setShowWizard(false); setStep(1); setAiLayoutOptions([]);}} className="text-construction-yellow hover:scale-110"><i className="fas fa-times-circle text-2xl"></i></button>
+              <h3 className="text-xl font-black uppercase tracking-widest italic">Phase {step}: {step === 4 ? 'Choose the Interior' : 'Site Configuration'}</h3>
+              <button onClick={() => {setShowWizard(false); setStep(1); setAiInteriorOptions([]);}} className="text-construction-yellow hover:scale-110"><i className="fas fa-times-circle text-2xl"></i></button>
             </div>
             <div className="p-8 overflow-y-auto construction-grid flex-grow">
               {step === 1 && (
@@ -512,39 +521,39 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ user, projects, o
               {step === 4 && (
                 <div className="space-y-8">
                   <div className="text-center">
-                    <h4 className="text-3xl font-black text-construction-slate uppercase italic">Architectural Site Strategy</h4>
-                    <p className="text-slate-500 font-bold text-xs uppercase mt-1">Generating multi-level layout including mandatory stairwells.</p>
+                    <h4 className="text-3xl font-black text-construction-slate uppercase italic">Choose the Interior</h4>
+                    <p className="text-slate-500 font-bold text-xs uppercase mt-1">Select an interior style that matches your vision.</p>
                   </div>
-                  {generatingLayout ? (
-                    <div className="py-24 text-center"><i className="fas fa-drafting-compass fa-spin text-7xl text-construction-yellow mb-8"></i><p className="text-sm font-black uppercase tracking-[0.3em] text-slate-600 animate-pulse italic">Synthesizing Dimensional Blueprint...</p></div>
-                  ) : aiLayoutOptions.length === 0 ? (
+                  {generatingInterior ? (
+                    <div className="py-24 text-center"><i className="fas fa-couch fa-spin text-7xl text-construction-yellow mb-8"></i><p className="text-sm font-black uppercase tracking-[0.3em] text-slate-600 animate-pulse italic">Visualizing Interior Spaces...</p></div>
+                  ) : aiInteriorOptions.length === 0 ? (
                     <div className="py-12 text-center bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
                       <i className="fas fa-exclamation-triangle text-4xl text-amber-500 mb-4"></i>
                       <p className="text-slate-600 font-bold mb-6 uppercase tracking-widest text-xs">Generation Failed or Timed Out</p>
                       <div className="flex flex-col sm:flex-row gap-4 justify-center">
                         <button 
-                          onClick={handleGenerateLayouts}
+                          onClick={handleGenerateInteriors}
                           className="bg-construction-slate text-construction-yellow px-8 py-3 rounded-xl font-black uppercase text-xs tracking-widest hover:bg-black transition-all"
                         >
                           Retry Generation
                         </button>
                         <button 
                           onClick={() => {
-                            setAiLayoutOptions([{ url: 'https://picsum.photos/seed/blueprint/800/800', style: 'Sample Layout' }]);
-                            setSelectedLayoutIndex(0);
+                            setAiInteriorOptions(getFallbackInteriors(details));
+                            setSelectedInteriorIndex(0);
                           }}
                           className="bg-slate-200 text-slate-600 px-8 py-3 rounded-xl font-black uppercase text-xs tracking-widest hover:bg-slate-300 transition-all"
                         >
-                          Use Sample & Skip
+                          Use Professional Samples
                         </button>
                       </div>
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      {aiLayoutOptions.map((opt, idx) => (
-                        <div key={idx} onClick={() => setSelectedLayoutIndex(idx)} className={`relative cursor-pointer group rounded-xl overflow-hidden border-4 transition-all ${selectedLayoutIndex === idx ? 'border-construction-yellow shadow-2xl scale-[1.02] z-10' : 'border-slate-100 opacity-60'}`}>
-                          <img src={opt.url} className="w-full aspect-square object-contain p-2" />
-                          <div className={`p-4 ${selectedLayoutIndex === idx ? 'bg-construction-yellow text-construction-slate' : 'bg-slate-50 text-slate-500'}`}><p className="font-black uppercase italic text-xs">{opt.style}</p></div>
+                      {aiInteriorOptions.map((opt, idx) => (
+                        <div key={idx} onClick={() => setSelectedInteriorIndex(idx)} className={`relative cursor-pointer group rounded-xl overflow-hidden border-4 transition-all ${selectedInteriorIndex === idx ? 'border-construction-yellow shadow-2xl scale-[1.02] z-10' : 'border-slate-100 opacity-60'}`}>
+                          <img src={opt.url} className="w-full aspect-video object-cover" />
+                          <div className={`p-4 ${selectedInteriorIndex === idx ? 'bg-construction-yellow text-construction-slate' : 'bg-slate-50 text-slate-500'}`}><p className="font-black uppercase italic text-xs">{opt.style}</p></div>
                         </div>
                       ))}
                     </div>
@@ -581,7 +590,7 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ user, projects, o
             </div>
             <div className="p-6 bg-slate-50 flex gap-4 border-t-4 border-construction-yellow">
               {step > 1 && <button onClick={handleBack} className="px-8 py-4 rounded font-black uppercase text-xs text-slate-500 border-2 border-slate-300">Previous</button>}
-              <button onClick={step === 5 ? handleFinalSubmit : handleNext} disabled={loading || generatingLayout || generatingDesigns || (step === 4 && selectedLayoutIndex === null) || (step === 5 && selectedDesignIndex === null)} className="flex-1 bg-construction-yellow text-construction-slate py-4 rounded font-black uppercase tracking-widest shadow-[4px_4px_0px_0px_rgba(30,41,59,1)] active:translate-y-1 transition-all disabled:opacity-30">
+              <button onClick={step === 5 ? handleFinalSubmit : handleNext} disabled={loading || generatingInterior || generatingDesigns || (step === 4 && selectedInteriorIndex === null) || (step === 5 && selectedDesignIndex === null)} className="flex-1 bg-construction-yellow text-construction-slate py-4 rounded font-black uppercase tracking-widest shadow-[4px_4px_0px_0px_rgba(30,41,59,1)] active:translate-y-1 transition-all disabled:opacity-30">
                 {loading ? <i className="fas fa-spinner fa-spin"></i> : (step === 5 ? 'Confirm & Deploy' : 'Advance Stage')}
               </button>
             </div>

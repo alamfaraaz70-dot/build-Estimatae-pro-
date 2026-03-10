@@ -41,7 +41,16 @@ const FieldBotModal: React.FC<FieldBotModalProps> = ({ onClose }) => {
         await window.aistudio.openSelectKey();
       }
 
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const apiKey = (process.env.API_KEY as string) || 
+                     (process.env.GEMINI_API_KEY as string) || 
+                     (import.meta as any).env?.VITE_GEMINI_API_KEY || 
+                     '';
+
+      if (!apiKey || apiKey === 'undefined') {
+        throw new Error("API Key is missing. Please select a key using the 'Key' button.");
+      }
+
+      const ai = new GoogleGenAI({ apiKey });
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: userMsg,

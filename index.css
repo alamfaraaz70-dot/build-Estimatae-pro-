@@ -1,5 +1,42 @@
+@import "tailwindcss";
+
 /* Global Styles */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap');
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-heading: "Barlow", sans-serif;
+
+  --color-construction-yellow: #FFD700;
+  --color-construction-yellowDark: #E6C200;
+  --color-construction-slate: #1E293B;
+  --color-construction-steel: #64748B;
+  --color-construction-caution: #FF4500;
+}
+
+@layer base {
+  body {
+    @apply font-sans bg-slate-50 text-slate-900;
+    background-image: radial-gradient(#cbd5e1 0.5px, transparent 0.5px);
+    background-size: 24px 24px;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading;
+  }
+}
+
+@layer components {
+  .construction-grid {
+    background-image: linear-gradient(rgba(255, 215, 0, 0.1) 1px, transparent 1px), 
+                      linear-gradient(90deg, rgba(255, 215, 0, 0.1) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+
+  .btn-construction {
+    @apply bg-construction-yellow hover:bg-construction-yellowDark text-construction-slate font-extrabold uppercase tracking-wider transition-all shadow-[4px_4px_0px_0px_rgba(30,41,59,1)] active:shadow-none active:translate-x-[2px] active:translate-y-[2px];
+  }
+}
 
 body {
   margin: 0;
